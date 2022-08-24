@@ -1,0 +1,42 @@
+import { Hop } from "@onehop/js";
+import { nanoid } from "nanoid";
+import { z } from "zod";
+
+const schema = z.object({
+	content: z.string().min(0).max(240),
+	author: z.string().min(3).max(32),
+});
+const projectToken = "ptk_c19hM2Q0ZjUyYmMzY2QyYjMxYzZhMGUyN2ZjYTkxMTI1Nl80Njg3OTgyOTgyOTk4MDE5NQ";
+const hop = new Hop(projectToken);
+
+export default async (req, res) => {
+	if (req.method !== "POST") {
+		return res.status(405).json({ success: false, message: "Must POST" });
+	}
+
+	const result = schema.safeParse(req.body);
+
+	if (!result.success) {
+		res.status(400).json({ success: false, message: "Invalid body" });
+		return;
+	}
+
+	const { content, author } = result.data;
+
+	const data = {
+		content,
+		author: author === "my_secret_value" ? "Admin" : author,
+		id: nanoid(),
+		isAdmin: author === "my_secret_value",
+	};
+
+	await hop.channels.publishMessage("messages", "MESSAGE_CREATE", data);
+
+	await hop.channels.setState("messages", state => ({
+		messages: [data, ...state.messages].slice(0, 20),
+	}));
+
+	res.json({
+		success: true,
+	});
+};
